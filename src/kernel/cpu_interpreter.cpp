@@ -220,8 +220,8 @@ if (quit) running = false;
 }
 } else if (rax == 101) { // sys_draw_car: rdi=fb, rbx=x, r8=y, rdx=color
 uint8_t* fb = mem_manager->get_pointer(rdi);
-int x0 = static_cast(rbx);
-int y0 = static_cast(r8);
+int x0 = (int)(rbx);
+int y0 = (int)(r8);
 uint32_t color = static_cast<uint32_t>(rdx & 0xFFFFFFFF);
 uint32_t glass = 0xFF202020;
 for (int dy = 0; dy < 10; ++dy) {
@@ -237,12 +237,12 @@ std::memcpy(fb + (py * 320 + px) * 4, &c, 4);
 }
 } else if (rax == 102) { // sys_play_sound: rdi=freq, rsi=ms
 if (audio_backend) {
-audio_backend->play_beep(static_cast(rdi), static_cast(rsi));
+audio_backend->play_beep((int)(rdi), (int)(rsi));
 }
 } else if (rax == 103) { // sys_draw_enemy: rdi=fb, r9=x, r10=y, rdx=color
 uint8_t* fb = mem_manager->get_pointer(rdi);
-int x0 = static_cast(r9);
-int y0 = static_cast(r10);
+int x0 = (int)(r9);
+int y0 = (int)(r10);
 uint32_t color = static_cast<uint32_t>(rdx & 0xFFFFFFFF);
 for (int dy = 0; dy < 10; ++dy) {
 for (int dx = 0; dx < 22; ++dx) {
