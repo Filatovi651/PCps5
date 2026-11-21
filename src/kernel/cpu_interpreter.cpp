@@ -7,8 +7,8 @@
 namespace openhle {
 namespace kernel {
 
-CpuInterpreter::CpuInterpreter(openhle::MemoryManager* mem_manager)
-    : mem_manager(mem_manager) {}
+CpuInterpreter::CpuInterpreter(openhle::MemoryManager* mem_manager, openhle::core::VideoBackend* video_backend)
+    : mem_manager(mem_manager), video_backend(video_backend) {}
 
 void CpuInterpreter::run(uint64_t start_address) {
     rip = start_address;
@@ -74,6 +74,10 @@ void CpuInterpreter::decode_and_execute(const uint8_t* buffer) {
             rip += 2;
         }
         return;
+    } else if (op0 == 0xEB) {                                     // jmp rel8 (безусловный переход)
+        int8_t offset = static_cast<int8_t>(op1);
+        rip = static_cast<uint64_t>(static_cast<int64_t>(rip + 2) + offset);
+        return;
     } else if (op0 == 0x0F && op1 == 0x05) {                      // syscall
         handle_syscall();
         rip += 2;
@@ -98,24 +102,21 @@ void CpuInterpreter::handle_syscall() {
     } else if (rax == 60) { // sys_exit
         std::cout << "[HLE] sys_exit called with code: " << rdi << "\n";
         running = false;
-    } else if (rax == 100) { // sys_present_frame (32x16 RGBA)
-        handle_sys_present_frame();
+    } else if (rax == 100) { // sys_present_frame (320x240) + poll_input
+        if (video_backend) {
+            const uint8_t* fb = mem_manager->get_pointer(rdi);
+            video_backend->present_frame(fb);
+            uint64_t keys = 0;
+            bool quit = false;
+            video_backend->poll_input(keys, quit);
+            rax = keys; // Возвращаем нажатые кнопки в RAX
+            if (quit) {
+                std::cout << "[HLE] Window closed by user.\n";
+                running = false;
+            }
+        }
     } else {
         std::cerr << "[HLE] Unimplemented syscall: " << rax << "\n";
-    }
-}
-
-void CpuInterpreter::handle_sys_present_frame() {
-    const uint8_t* fb = mem_manager->get_pointer(rdi);
-    for (int y = 0; y < 16; ++y) {
-        for (int x = 0; x < 32; ++x) {
-            size_t idx = (y * 32 + x) * 4;
-            int r = *(fb + idx + 0);
-            int g = *(fb + idx + 1);
-            int b = *(fb + idx + 2);
-            std::cout << "\033[48;2;" << r << ";" << g << ";" << b << "m  ";
-        }
-        std::cout << "\033[0m\n";
     }
 }
 

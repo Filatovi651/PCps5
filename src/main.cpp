@@ -1,5 +1,6 @@
 #include "loader/elf_parser.h"
 #include "core/memory_manager.h"
+#include "core/video_backend.h"
 #include "kernel/cpu_interpreter.h"
 #include <iostream>
 
@@ -14,7 +15,7 @@ int main(int argc, char* argv[]) {
         uint64_t entry_point = 0;
         std::vector<openhle::loader::LoadableSegment> segments;
 
-        if (!parser.load_executable(argv[1], entry_point, segments)) {
+        if (!parser.load_executable(*(argv + 1), entry_point, segments)) {
             return 1;
         }
 
@@ -26,7 +27,8 @@ int main(int argc, char* argv[]) {
             memory.map_segment(seg.vaddr, seg.data, seg.memsz);
         }
 
-        openhle::kernel::CpuInterpreter cpu(&memory);
+        openhle::core::VideoBackend video;
+        openhle::kernel::CpuInterpreter cpu(&memory, &video);
         cpu.run(entry_point);
 
     } catch (const std::exception& e) {
