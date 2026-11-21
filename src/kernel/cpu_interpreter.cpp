@@ -1,4 +1,5 @@
 #include "cpu_interpreter.h"
+#include <array>
 #include <cstring>
 #include <iostream>
 #include <unistd.h>
@@ -14,9 +15,9 @@ void CpuInterpreter::run(uint64_t start_address) {
     running = true;
 
     while (running) {
-        uint8_t buffer[15] = {0};
-        fetch(buffer, sizeof(buffer));
-        decode_and_execute(buffer);
+        std::array<uint8_t, 15> buffer{};
+        fetch(buffer.data(), buffer.size());
+        decode_and_execute(buffer.data());
     }
 }
 
@@ -26,57 +27,95 @@ void CpuInterpreter::fetch(uint8_t* buffer, size_t buffer_size) {
 }
 
 void CpuInterpreter::decode_and_execute(const uint8_t* buffer) {
-    if (buffer[0] == 0x48) {
+    uint8_t op0 = *(buffer + 0);
+    uint8_t op1 = *(buffer + 1);
+    uint8_t op2 = *(buffer + 2);
+    uint8_t op3 = *(buffer + 3);
+
+    if (op0 == 0x48) {
         uint64_t imm64 = 0;
         std::memcpy(&imm64, buffer + 2, sizeof(uint64_t));
 
-        switch (buffer[1]) {
-            case 0xB8: // mov rax, imm64
-                rax = imm64;
-                rip += 10;
-                return;
-            case 0xBF: // mov rdi, imm64
-                rdi = imm64;
-                rip += 10;
-                return;
-            case 0xBE: // mov rsi, imm64
-                rsi = imm64;
-                rip += 10;
-                return;
-            case 0xBA: // mov rdx, imm64
-                rdx = imm64;
-                rip += 10;
-                return;
+        if (op1 == 0xB8) { rax = imm64; rip += 10; return; }      // mov rax, imm64
+        if (op1 == 0xB9) { rcx = imm64; rip += 10; return; }      // mov rcx, imm64
+        if (op1 == 0xBA) { rdx = imm64; rip += 10; return; }      // mov rdx, imm64
+        if (op1 == 0xBE) { rsi = imm64; rip += 10; return; }      // mov rsi, imm64
+        if (op1 == 0xBF) { rdi = imm64; rip += 10; return; }      // mov rdi, imm64
+
+        if (op1 == 0x83 && op2 == 0xC7 && op3 == 0x04) {          // add rdi, 4
+            rdi += 4;
+            rip += 4;
+            return;
         }
-    } else if (buffer[0] == 0x0F && buffer[1] == 0x05) { // syscall
+        if (op1 == 0xFF && op2 == 0xC9) {                         // dec rcx
+            rcx -= 1;
+            zf = (rcx == 0);
+            rip += 3;
+            return;
+        }
+    } else if (op0 == 0x89 && op1 == 0x07) {                      // mov dword ptr [rdi], eax
+        uint32_t val = static_cast<uint32_t>(rax & 0xFFFFFFFF);
+        uint8_t* dst = mem_manager->get_pointer(rdi);
+        std::memcpy(dst, &val, sizeof(uint32_t));
+        rip += 2;
+        return;
+    } else if (op0 == 0x05) {                                     // add eax, imm32
+        uint32_t imm32 = 0;
+        std::memcpy(&imm32, buffer + 1, sizeof(uint32_t));
+        uint32_t eax = static_cast<uint32_t>(rax & 0xFFFFFFFF) + imm32;
+        rax = (rax & 0xFFFFFFFF00000000ULL) | eax;
+        rip += 5;
+        return;
+    } else if (op0 == 0x75) {                                     // jnz rel8
+        int8_t offset = static_cast<int8_t>(op1);
+        if (!zf) {
+            rip = static_cast<uint64_t>(static_cast<int64_t>(rip + 2) + offset);
+        } else {
+            rip += 2;
+        }
+        return;
+    } else if (op0 == 0x0F && op1 == 0x05) {                      // syscall
         handle_syscall();
         rip += 2;
         return;
-    } else if (buffer[0] == 0xC3) { // ret
-        std::cout << "[CPU] Reached RET instruction. Halting execution.\n";
+    } else if (op0 == 0xC3) {                                     // ret
         running = false;
         return;
     }
 
-    std::cerr << "[CPU] Unknown instruction 0x" << std::hex << static_cast<int>(buffer[0])
+    std::cerr << "[CPU] Unknown instruction 0x" << std::hex << static_cast<int>(op0)
               << " at 0x" << rip << std::dec << "\n";
     running = false;
 }
 
 void CpuInterpreter::handle_syscall() {
     if (rax == 1) { // sys_write
-        if (rdi == 1) { // stdout
+        if (rdi == 1) {
             const char* str_ptr = reinterpret_cast<const char*>(mem_manager->get_pointer(rsi));
             ssize_t written = write(STDOUT_FILENO, str_ptr, rdx);
-            if (written == -1) {
-                std::cerr << "[HLE] sys_write failed\n";
-            }
+            (void)written;
         }
     } else if (rax == 60) { // sys_exit
         std::cout << "[HLE] sys_exit called with code: " << rdi << "\n";
         running = false;
+    } else if (rax == 100) { // sys_present_frame (32x16 RGBA)
+        handle_sys_present_frame();
     } else {
         std::cerr << "[HLE] Unimplemented syscall: " << rax << "\n";
+    }
+}
+
+void CpuInterpreter::handle_sys_present_frame() {
+    const uint8_t* fb = mem_manager->get_pointer(rdi);
+    for (int y = 0; y < 16; ++y) {
+        for (int x = 0; x < 32; ++x) {
+            size_t idx = (y * 32 + x) * 4;
+            int r = *(fb + idx + 0);
+            int g = *(fb + idx + 1);
+            int b = *(fb + idx + 2);
+            std::cout << "\033[48;2;" << r << ";" << g << ";" << b << "m  ";
+        }
+        std::cout << "\033[0m\n";
     }
 }
 
