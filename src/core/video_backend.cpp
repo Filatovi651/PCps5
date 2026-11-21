@@ -1,7 +1,7 @@
 #include "video_backend.h"
 #include <iostream>
 
-namespace openhle {
+namespace pcps5 {
 namespace core {
 
 VideoBackend::VideoBackend() {
@@ -10,7 +10,7 @@ VideoBackend::VideoBackend() {
         return;
     }
 
-    window = SDL_CreateWindow("OpenHLE Display (320x240)", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, 640, 480, SDL_WINDOW_SHOWN);
+    window = SDL_CreateWindow("PCps5 Display (320x240)", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, 640, 480, SDL_WINDOW_SHOWN);
     if (!window) return;
 
     renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC);
@@ -53,4 +53,4 @@ void VideoBackend::poll_input(uint64_t& out_key_mask, bool& out_quit) {
 }
 
 } // namespace core
-} // namespace openhle
+} // namespace pcps5
