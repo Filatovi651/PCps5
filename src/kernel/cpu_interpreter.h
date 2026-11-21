@@ -28,6 +28,7 @@ private:
     uint64_t initial_rsp = 0x800000;
     uint64_t rip = 0;
     bool zf = false;
+    bool sf = false;
     bool running = false;
 
     void push64(uint64_t value);

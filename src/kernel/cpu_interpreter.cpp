@@ -58,6 +58,15 @@ void CpuInterpreter::decode_and_execute(const uint8_t* buffer) {
         if (op1 == 0xBE) { rsi = imm64; rip += 10; return; }      // mov rsi, imm64
         if (op1 == 0xBF) { rdi = imm64; rip += 10; return; }      // mov rdi, imm64
 
+        if (op1 == 0x81 && op2 == 0xFB) {                         // cmp rbx, imm32
+            int32_t imm32 = 0;
+            std::memcpy(&imm32, buffer + 3, sizeof(int32_t));
+            int64_t diff = static_cast<int64_t>(rbx) - static_cast<int64_t>(imm32);
+            zf = (diff == 0);
+            sf = (diff < 0);
+            rip += 7;
+            return;
+        }
         if (op1 == 0x83 && op2 == 0xC3) {                         // add rbx, imm8
             rbx = static_cast<uint64_t>(static_cast<int64_t>(rbx) + static_cast<int8_t>(op3));
             rip += 4;
@@ -82,6 +91,15 @@ void CpuInterpreter::decode_and_execute(const uint8_t* buffer) {
             rip += 10;
             return;
         }
+        if (op1 == 0x81 && op2 == 0xF8) {                         // cmp r8, imm32
+            int32_t imm32 = 0;
+            std::memcpy(&imm32, buffer + 3, sizeof(int32_t));
+            int64_t diff = static_cast<int64_t>(r8) - static_cast<int64_t>(imm32);
+            zf = (diff == 0);
+            sf = (diff < 0);
+            rip += 7;
+            return;
+        }
         if (op1 == 0x83 && op2 == 0xC0) {                         // add r8, imm8
             r8 = static_cast<uint64_t>(static_cast<int64_t>(r8) + static_cast<int8_t>(op3));
             rip += 4;
@@ -94,11 +112,19 @@ void CpuInterpreter::decode_and_execute(const uint8_t* buffer) {
         return;
     } else if (op0 == 0x74) {                                     // jz rel8
         int8_t offset = static_cast<int8_t>(op1);
-        if (zf) {
-            rip = static_cast<uint64_t>(static_cast<int64_t>(rip + 2) + offset);
-        } else {
-            rip += 2;
-        }
+        rip = zf ? static_cast<uint64_t>(static_cast<int64_t>(rip + 2) + offset) : (rip + 2);
+        return;
+    } else if (op0 == 0x75) {                                     // jnz rel8
+        int8_t offset = static_cast<int8_t>(op1);
+        rip = !zf ? static_cast<uint64_t>(static_cast<int64_t>(rip + 2) + offset) : (rip + 2);
+        return;
+    } else if (op0 == 0x7C) {                                     // jl rel8 (меньше со знаком)
+        int8_t offset = static_cast<int8_t>(op1);
+        rip = sf ? static_cast<uint64_t>(static_cast<int64_t>(rip + 2) + offset) : (rip + 2);
+        return;
+    } else if (op0 == 0x7F) {                                     // jg rel8 (больше со знаком)
+        int8_t offset = static_cast<int8_t>(op1);
+        rip = (!zf && !sf) ? static_cast<uint64_t>(static_cast<int64_t>(rip + 2) + offset) : (rip + 2);
         return;
     } else if (op0 == 0x89 && op1 == 0x07) {                      // mov dword ptr [rdi], eax
         uint32_t val = static_cast<uint32_t>(rax & 0xFFFFFFFF);
@@ -112,14 +138,6 @@ void CpuInterpreter::decode_and_execute(const uint8_t* buffer) {
         uint32_t eax = static_cast<uint32_t>(rax & 0xFFFFFFFF) + imm32;
         rax = (rax & 0xFFFFFFFF00000000ULL) | eax;
         rip += 5;
-        return;
-    } else if (op0 == 0x75) {                                     // jnz rel8
-        int8_t offset = static_cast<int8_t>(op1);
-        if (!zf) {
-            rip = static_cast<uint64_t>(static_cast<int64_t>(rip + 2) + offset);
-        } else {
-            rip += 2;
-        }
         return;
     } else if (op0 == 0xE9) {                                     // jmp rel32
         int32_t offset = 0;
@@ -199,14 +217,13 @@ void CpuInterpreter::handle_syscall() {
                 int px = x0 + dx;
                 int py = y0 + dy;
                 if (px >= 0 && px < 320 && py >= 0 && py < 240) {
-                    std::memcpy(fb + (py * 320 + px) * 4, &color, 4);
-                }
-            }
-        }
-    } else {
-        std::cerr << "[HLE] Unimplemented syscall: " << rax << "\n";
-    }
+ std::memcpy(fb + (py * 320 + px) * 4, &color, 4);
 }
-
+}
+}
+} else {
+std::cerr << "[HLE] Unimplemented syscall: " << rax << "\n";
+}
+}
 } // namespace kernel
 } // namespace openhle
