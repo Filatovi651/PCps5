@@ -1,7 +1,7 @@
 #include "video_backend.h"
 #include <iostream>
 
-namespace pcps5 {
+namespace openhle {
 namespace core {
 
 VideoBackend::VideoBackend() {
@@ -53,4 +53,4 @@ void VideoBackend::poll_input(uint64_t& out_key_mask, bool& out_quit) {
 }
 
 } // namespace core
-} // namespace pcps5
+} // namespace openhle
