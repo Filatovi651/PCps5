@@ -39,9 +39,15 @@ void CpuInterpreter::decode_and_execute(const uint8_t* buffer) {
         if (op1 == 0xB8) { rax = imm64; rip += 10; return; }      // mov rax, imm64
         if (op1 == 0xB9) { rcx = imm64; rip += 10; return; }      // mov rcx, imm64
         if (op1 == 0xBA) { rdx = imm64; rip += 10; return; }      // mov rdx, imm64
+        if (op1 == 0xBB) { rbx = imm64; rip += 10; return; }      // mov rbx, imm64
         if (op1 == 0xBE) { rsi = imm64; rip += 10; return; }      // mov rsi, imm64
         if (op1 == 0xBF) { rdi = imm64; rip += 10; return; }      // mov rdi, imm64
 
+        if (op1 == 0x83 && op2 == 0xC3) {                         // add rbx, imm8 (X += dx)
+            rbx = static_cast<uint64_t>(static_cast<int64_t>(rbx) + static_cast<int8_t>(op3));
+            rip += 4;
+            return;
+        }
         if (op1 == 0x83 && op2 == 0xC7 && op3 == 0x04) {          // add rdi, 4
             rdi += 4;
             rip += 4;
@@ -53,6 +59,32 @@ void CpuInterpreter::decode_and_execute(const uint8_t* buffer) {
             rip += 3;
             return;
         }
+    } else if (op0 == 0x49) {
+        if (op1 == 0xB8) {                                        // mov r8, imm64
+            uint64_t imm64 = 0;
+            std::memcpy(&imm64, buffer + 2, sizeof(uint64_t));
+            r8 = imm64;
+            rip += 10;
+            return;
+        }
+        if (op1 == 0x83 && op2 == 0xC0) {                         // add r8, imm8 (Y += dy)
+            r8 = static_cast<uint64_t>(static_cast<int64_t>(r8) + static_cast<int8_t>(op3));
+            rip += 4;
+            return;
+        }
+    } else if (op0 == 0xA8) {                                     // test al, imm8
+        uint8_t al = static_cast<uint8_t>(rax & 0xFF);
+        zf = ((al & op1) == 0);
+        rip += 2;
+        return;
+    } else if (op0 == 0x74) {                                     // jz rel8
+        int8_t offset = static_cast<int8_t>(op1);
+        if (zf) {
+            rip = static_cast<uint64_t>(static_cast<int64_t>(rip + 2) + offset);
+        } else {
+            rip += 2;
+        }
+        return;
     } else if (op0 == 0x89 && op1 == 0x07) {                      // mov dword ptr [rdi], eax
         uint32_t val = static_cast<uint32_t>(rax & 0xFFFFFFFF);
         uint8_t* dst = mem_manager->get_pointer(rdi);
@@ -74,9 +106,25 @@ void CpuInterpreter::decode_and_execute(const uint8_t* buffer) {
             rip += 2;
         }
         return;
-    } else if (op0 == 0xEB) {                                     // jmp rel8 (безусловный переход)
+    } else if (op0 == 0xE9) {                                     // jmp rel32 (длинный переход)
+        int32_t offset = 0;
+        std::memcpy(&offset, buffer + 1, sizeof(int32_t));
+        rip = static_cast<uint64_t>(static_cast<int64_t>(rip + 5) + offset);
+        return;
+    } else if (op0 == 0xEB) {                                     // jmp rel8
         int8_t offset = static_cast<int8_t>(op1);
         rip = static_cast<uint64_t>(static_cast<int64_t>(rip + 2) + offset);
+        return;
+    } else if (op0 == 0xF3 && op1 == 0xA5) {                      // rep movsd
+        if (rcx > 0) {
+            uint8_t* dst = mem_manager->get_pointer(rdi);
+            const uint8_t* src = mem_manager->get_pointer(rsi);
+            std::memcpy(dst, src, rcx * 4);
+            rdi += rcx * 4;
+            rsi += rcx * 4;
+            rcx = 0;
+        }
+        rip += 2;
         return;
     } else if (op0 == 0x0F && op1 == 0x05) {                      // syscall
         handle_syscall();
@@ -109,10 +157,24 @@ void CpuInterpreter::handle_syscall() {
             uint64_t keys = 0;
             bool quit = false;
             video_backend->poll_input(keys, quit);
-            rax = keys; // Возвращаем нажатые кнопки в RAX
+            rax = keys;
             if (quit) {
                 std::cout << "[HLE] Window closed by user.\n";
                 running = false;
+            }
+        }
+    } else if (rax == 101) { // sys_draw_rect: rdi=fb, rbx=x, r8=y, rdx=color
+        uint8_t* fb = mem_manager->get_pointer(rdi);
+        int x0 = static_cast<int>(rbx);
+        int y0 = static_cast<int>(r8);
+        uint32_t color = static_cast<uint32_t>(rdx & 0xFFFFFFFF);
+        for (int dy = 0; dy < 16; ++dy) {
+            for (int dx = 0; dx < 16; ++dx) {
+                int px = x0 + dx;
+                int py = y0 + dy;
+                if (px >= 0 && px < 320 && py >= 0 && py < 240) {
+                    std::memcpy(fb + (py * 320 + px) * 4, &color, 4);
+                }
             }
         }
     } else {

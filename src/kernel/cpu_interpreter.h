@@ -18,10 +18,12 @@ private:
     openhle::MemoryManager* mem_manager;
     openhle::core::VideoBackend* video_backend;
     uint64_t rax = 0;
+    uint64_t rbx = 0; // Координата X
     uint64_t rcx = 0;
     uint64_t rdx = 0;
     uint64_t rdi = 0;
     uint64_t rsi = 0;
+    uint64_t r8 = 0;  // Координата Y
     uint64_t rip = 0;
     bool zf = false;
     bool running = false;
