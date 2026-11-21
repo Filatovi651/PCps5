@@ -11,9 +11,9 @@ int main(int argc, char* argv[]) {
         return 1;
     }
 
-    pcps5::loader::ElfParser parser;
+    openhle::loader::ElfParser parser;
     uint64_t entry_point = 0;
-    std::vector<pcps5::loader::LoadableSegment> segments;
+    std::vector<openhle::loader::LoadableSegment> segments;
 
     if (!parser.load_executable(*(argv + 1), entry_point, segments)) {
         return 1;
@@ -22,9 +22,9 @@ int main(int argc, char* argv[]) {
     std::cout << "[PCps5 v2.0 JIT] Loaded " << segments.size() << " segments. Entry: 0x"
               << std::hex << entry_point << std::dec << "\n";
 
-    pcps5::core::VideoBackend video;
-    pcps5::core::AudioBackend audio;
-    pcps5::kernel::UnicornCpu cpu(&video, &audio);
+    openhle::core::VideoBackend video;
+    openhle::core::AudioBackend audio;
+    openhle::kernel::UnicornCpu cpu(&video, &audio);
 
     for (const auto& seg : segments) {
         cpu.map_segment(seg.vaddr, seg.data);
