@@ -18,16 +18,20 @@ private:
     openhle::MemoryManager* mem_manager;
     openhle::core::VideoBackend* video_backend;
     uint64_t rax = 0;
-    uint64_t rbx = 0; // Координата X
+    uint64_t rbx = 0;
     uint64_t rcx = 0;
     uint64_t rdx = 0;
     uint64_t rdi = 0;
     uint64_t rsi = 0;
-    uint64_t r8 = 0;  // Координата Y
+    uint64_t r8 = 0;
+    uint64_t rsp = 0x800000;
+    uint64_t initial_rsp = 0x800000;
     uint64_t rip = 0;
     bool zf = false;
     bool running = false;
 
+    void push64(uint64_t value);
+    uint64_t pop64();
     void fetch(uint8_t* buffer, size_t buffer_size);
     void decode_and_execute(const uint8_t* buffer);
     void handle_syscall();

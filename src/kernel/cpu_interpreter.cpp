@@ -10,8 +10,23 @@ namespace kernel {
 CpuInterpreter::CpuInterpreter(openhle::MemoryManager* mem_manager, openhle::core::VideoBackend* video_backend)
     : mem_manager(mem_manager), video_backend(video_backend) {}
 
+void CpuInterpreter::push64(uint64_t value) {
+    rsp -= 8;
+    uint8_t* ptr = mem_manager->get_pointer(rsp);
+    std::memcpy(ptr, &value, sizeof(uint64_t));
+}
+
+uint64_t CpuInterpreter::pop64() {
+    const uint8_t* ptr = mem_manager->get_pointer(rsp);
+    uint64_t value = 0;
+    std::memcpy(&value, ptr, sizeof(uint64_t));
+    rsp += 8;
+    return value;
+}
+
 void CpuInterpreter::run(uint64_t start_address) {
     rip = start_address;
+    rsp = initial_rsp;
     running = true;
 
     while (running) {
@@ -43,7 +58,7 @@ void CpuInterpreter::decode_and_execute(const uint8_t* buffer) {
         if (op1 == 0xBE) { rsi = imm64; rip += 10; return; }      // mov rsi, imm64
         if (op1 == 0xBF) { rdi = imm64; rip += 10; return; }      // mov rdi, imm64
 
-        if (op1 == 0x83 && op2 == 0xC3) {                         // add rbx, imm8 (X += dx)
+        if (op1 == 0x83 && op2 == 0xC3) {                         // add rbx, imm8
             rbx = static_cast<uint64_t>(static_cast<int64_t>(rbx) + static_cast<int8_t>(op3));
             rip += 4;
             return;
@@ -67,7 +82,7 @@ void CpuInterpreter::decode_and_execute(const uint8_t* buffer) {
             rip += 10;
             return;
         }
-        if (op1 == 0x83 && op2 == 0xC0) {                         // add r8, imm8 (Y += dy)
+        if (op1 == 0x83 && op2 == 0xC0) {                         // add r8, imm8
             r8 = static_cast<uint64_t>(static_cast<int64_t>(r8) + static_cast<int8_t>(op3));
             rip += 4;
             return;
@@ -106,7 +121,7 @@ void CpuInterpreter::decode_and_execute(const uint8_t* buffer) {
             rip += 2;
         }
         return;
-    } else if (op0 == 0xE9) {                                     // jmp rel32 (длинный переход)
+    } else if (op0 == 0xE9) {                                     // jmp rel32
         int32_t offset = 0;
         std::memcpy(&offset, buffer + 1, sizeof(int32_t));
         rip = static_cast<uint64_t>(static_cast<int64_t>(rip + 5) + offset);
@@ -114,6 +129,20 @@ void CpuInterpreter::decode_and_execute(const uint8_t* buffer) {
     } else if (op0 == 0xEB) {                                     // jmp rel8
         int8_t offset = static_cast<int8_t>(op1);
         rip = static_cast<uint64_t>(static_cast<int64_t>(rip + 2) + offset);
+        return;
+    } else if (op0 == 0xE8) {                                     // call rel32
+        int32_t offset = 0;
+        std::memcpy(&offset, buffer + 1, sizeof(int32_t));
+        push64(rip + 5);
+        rip = static_cast<uint64_t>(static_cast<int64_t>(rip + 5) + offset);
+        return;
+    } else if (op0 == 0xC3) {                                     // ret
+        if (rsp >= initial_rsp) {
+            std::cout << "[CPU] Main returned cleanly. Halting.\n";
+            running = false;
+        } else {
+            rip = pop64();
+        }
         return;
     } else if (op0 == 0xF3 && op1 == 0xA5) {                      // rep movsd
         if (rcx > 0) {
@@ -129,9 +158,6 @@ void CpuInterpreter::decode_and_execute(const uint8_t* buffer) {
     } else if (op0 == 0x0F && op1 == 0x05) {                      // syscall
         handle_syscall();
         rip += 2;
-        return;
-    } else if (op0 == 0xC3) {                                     // ret
-        running = false;
         return;
     }
 
