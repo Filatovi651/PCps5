@@ -5,18 +5,22 @@
 #include <cstddef>
 #include "../core/memory_manager.h"
 #include "../core/video_backend.h"
+#include "../core/audio_backend.h"
 
 namespace openhle {
 namespace kernel {
 
 class CpuInterpreter {
 public:
-    CpuInterpreter(openhle::MemoryManager* mem_manager, openhle::core::VideoBackend* video_backend = nullptr);
+    CpuInterpreter(openhle::MemoryManager* mem_manager,
+                   openhle::core::VideoBackend* video_backend = nullptr,
+                   openhle::core::AudioBackend* audio_backend = nullptr);
     void run(uint64_t start_address);
 
 private:
     openhle::MemoryManager* mem_manager;
     openhle::core::VideoBackend* video_backend;
+    openhle::core::AudioBackend* audio_backend;
     uint64_t rax = 0;
     uint64_t rbx = 0;
     uint64_t rcx = 0;
@@ -24,6 +28,8 @@ private:
     uint64_t rdi = 0;
     uint64_t rsi = 0;
     uint64_t r8 = 0;
+    uint64_t r9 = 0;
+    uint64_t r10 = 0;
     uint64_t rsp = 0x800000;
     uint64_t initial_rsp = 0x800000;
     uint64_t rip = 0;
