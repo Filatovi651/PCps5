@@ -20,7 +20,7 @@ public:
 private:
 #pragma pack(push, 1)
     struct Elf64_Ehdr {
-        uint8_t e_ident;
+        uint8_t e_ident[16];
         uint16_t e_type;
         uint16_t e_machine;
         uint32_t e_version;
