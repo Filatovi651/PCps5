@@ -5,13 +5,29 @@ namespace openhle {
 namespace hle {
 
 SceLibRegistry::SceLibRegistry() {
+    // 1. libSceVideoOut & libSceAudioOut & libScePad
     symbol_map.emplace("sceVideoOutOpen", 200);
     symbol_map.emplace("sceVideoOutSubmitFlip", 201);
     symbol_map.emplace("sceAudioOutInit", 202);
     symbol_map.emplace("sceAudioOutOutput", 203);
     symbol_map.emplace("scePadInit", 204);
     symbol_map.emplace("scePadReadState", 205);
+
+    // 2. libkernel (Память, время, потоки и управление процессом)
     symbol_map.emplace("sceKernelUsleep", 206);
+    symbol_map.emplace("sceKernelGetProcessTime", 207);
+    symbol_map.emplace("sceKernelAllocateDirectMemory", 208);
+    symbol_map.emplace("sceKernelExitProcess", 60);
+
+    // 3. libSceSystemService (Системные сервисы консоли)
+    symbol_map.emplace("sceSystemServiceHideSplashScreen", 209);
+    symbol_map.emplace("sceSystemServiceGetStatus", 209);
+
+    // 4. libc (Стандартные функции C для динамических бинарников)
+    symbol_map.emplace("malloc", 208);
+    symbol_map.emplace("puts", 210);
+    symbol_map.emplace("memset", 211);
+    symbol_map.emplace("memcpy", 212);
 }
 
 uint32_t SceLibRegistry::get_syscall_id(const std::string& symbol_name) const {

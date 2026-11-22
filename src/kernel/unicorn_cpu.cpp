@@ -3,6 +3,7 @@
 #include <cstring>
 #include <string>
 #include <unistd.h>
+#include <chrono>
 
 namespace openhle {
 namespace kernel {
@@ -152,6 +153,38 @@ void UnicornCpu::handle_syscall() {
         }
     } else if (rax == 206) { // sceKernelUsleep
         usleep((useconds_t)rdi);
+    } else if (rax == 207) { // sceKernelGetProcessTime (микросекунды)
+        auto now = std::chrono::steady_clock::now().time_since_epoch();
+        uint64_t us = std::chrono::duration_cast<std::chrono::microseconds>(now).count();
+        uc_reg_write(uc, UC_X86_REG_RAX, &us);
+    } else if (rax == 208) { // malloc / sceKernelAllocateDirectMemory
+        static uint64_t heap_ptr = 0xA00000;
+        uint64_t size = (rdi > 0) ? rdi : 4096;
+        uint64_t allocated = heap_ptr;
+        heap_ptr += (size + 15) & ~15ULL;
+        uc_reg_write(uc, UC_X86_REG_RAX, &allocated);
+    } else if (rax == 209) { // sceSystemServiceHideSplashScreen
+        uint64_t ok = 0;
+        uc_reg_write(uc, UC_X86_REG_RAX, &ok);
+    } else if (rax == 210) { // puts(const char* s)
+        std::string str(512, 0);
+        uc_mem_read(uc, rdi, str.data(), 511);
+        std::cout << str.c_str() << "\n";
+        uint64_t ok = 0;
+        uc_reg_write(uc, UC_X86_REG_RAX, &ok);
+    } else if (rax == 211) { // memset(dst, val, size)
+        if (rdx > 0) {
+            std::vector<uint8_t> buf(rdx, (uint8_t)(rsi & 0xFF));
+            uc_mem_write(uc, rdi, buf.data(), rdx);
+        }
+        uc_reg_write(uc, UC_X86_REG_RAX, &rdi);
+    } else if (rax == 212) { // memcpy(dst, src, size)
+        if (rdx > 0) {
+            std::vector<uint8_t> buf(rdx);
+            uc_mem_read(uc, rsi, buf.data(), rdx);
+            uc_mem_write(uc, rdi, buf.data(), rdx);
+        }
+        uc_reg_write(uc, UC_X86_REG_RAX, &rdi);
     }
 }
 
