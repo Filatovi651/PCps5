@@ -228,7 +228,7 @@ void UnicornCpu::handle_syscall() {
     } else if (rax == 230) { // sceGnmInit / sceAgcInit -> Vulkan/MoltenVK 3D GPU
         openhle::core::VulkanBackend vk;
         uint64_t ok = vk.is_ready() ? 0 : (uint64_t)-1;
-        if (vk.is_ready()) SDL_Delay(1500);
+        if (vk.is_ready()) for (int f = 0; f < 180; ++f) { SDL_Event e; while (SDL_PollEvent(&e)) { if (e.type == SDL_QUIT) f = 180; } vk.draw_3d_frame(); SDL_Delay(16); }
         uc_reg_write(uc, UC_X86_REG_RAX, &ok);
     }
 }

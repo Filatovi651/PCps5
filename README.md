@@ -57,7 +57,7 @@ x86_64-elf-gcc -O2 -ffreestanding -nostdlib -Wl,-Ttext=0x401000 tests/c_maze.c -
 - [x] **10.0%** — Clean-Room HLE Modules (`libkernel`, `libSceSystemService`, `libc`)
 - [x] **15.0%** — Multi-threading (`libScePthread` cooperative context switching)
 - [x] **25.0%** — Hardware 3D GPU Initialization (`Vulkan` / `MoltenVK` on Apple Silicon)
-- [ ] **40.0%** — Hardware 3D Rendering Backend via Vulkan / MoltenVK
+- [x] **40.0%** — Hardware 3D Rendering Backend via Vulkan / MoltenVK
 
 ## Contributing & Help Wanted
 
