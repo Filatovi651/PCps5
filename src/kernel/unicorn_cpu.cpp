@@ -124,6 +124,7 @@ void UnicornCpu::handle_syscall() {
         uint64_t ok = 0;
         uc_reg_write(uc, UC_X86_REG_RAX, &ok);
     } else if (rax == 60) { // sys_exit
+        SDL_Delay(200);
         uc_emu_stop(uc);
     } else if (rax == 100 || rax == 201) { // sys_present_frame / sceVideoOutSubmitFlip
         if (video_backend) {
