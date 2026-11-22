@@ -19,6 +19,10 @@ SceLibRegistry::SceLibRegistry() {
     symbol_map.emplace("sceKernelAllocateDirectMemory", 208);
     symbol_map.emplace("sceKernelExitProcess", 60);
 
+    // 6. libSceGnmDriver / libSceAgc (3D GPU Hardware Initialization)
+    symbol_map.emplace("sceGnmInit", 230);
+    symbol_map.emplace("sceAgcInit", 230);
+
     // 3. libSceSystemService (Системные сервисы консоли)
     symbol_map.emplace("sceSystemServiceHideSplashScreen", 209);
     symbol_map.emplace("sceSystemServiceGetStatus", 209);

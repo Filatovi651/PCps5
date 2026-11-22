@@ -1,3 +1,4 @@
+#include "../core/vulkan_backend.h"
 #include "unicorn_cpu.h"
 #include <iostream>
 #include <cstring>
@@ -223,6 +224,11 @@ void UnicornCpu::handle_syscall() {
         uc_reg_write(uc, UC_X86_REG_RAX, &ok);
     } else if (rax == 221 || rax == 222) { // scePthreadJoin & Mutex stubs
         uint64_t ok = 0;
+        uc_reg_write(uc, UC_X86_REG_RAX, &ok);
+    } else if (rax == 230) { // sceGnmInit / sceAgcInit -> Vulkan/MoltenVK 3D GPU
+        openhle::core::VulkanBackend vk;
+        uint64_t ok = vk.is_ready() ? 0 : (uint64_t)-1;
+        if (vk.is_ready()) SDL_Delay(1500);
         uc_reg_write(uc, UC_X86_REG_RAX, &ok);
     }
 }
