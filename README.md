@@ -53,7 +53,7 @@ x86_64-elf-gcc -O2 -ffreestanding -nostdlib -Wl,-Ttext=0x401000 tests/c_maze.c -
 - [x] **1.0%** — Unicorn JIT `x86-64` Execution + SDL2 Video, Input & Audio Backend
 - [x] **1.5%** — Static Relinker (`.dynsym` / `.rela.plt` import & relocation scanner)
 - [x] **2.0%** — Sandboxed HLE Filesystem (`sys_open`, `sys_read`, `sys_close`) & C Homebrew SDK
-- [ ] **5.0%** — Automatic GOT/PLT Trampoline Patching in Unicorn Memory
+- [x] **5.0%** — Automatic GOT/PLT Trampoline Patching in Unicorn Memory
 - [ ] **15.0%** — Multi-threading (`pthread` HLE stubs) & Gamepad Input Support
 - [ ] **40.0%** — Hardware 3D Rendering Backend via Vulkan / MoltenVK
 
