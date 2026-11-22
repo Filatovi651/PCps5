@@ -1,18 +1,25 @@
 #include "audio_backend.h"
 #include <vector>
 #include <cmath>
+#include <iostream>
 
 namespace openhle {
 namespace core {
 
 AudioBackend::AudioBackend() {
+    if (SDL_InitSubSystem(SDL_INIT_AUDIO) < 0) {
+        std::cerr << "[Audio] SDL_INIT_AUDIO failed: " << SDL_GetError() << "\n";
+        return;
+    }
     SDL_AudioSpec want{};
     want.freq = 44100;
     want.format = AUDIO_S16SYS;
     want.channels = 1;
     want.samples = 2048;
     dev = SDL_OpenAudioDevice(nullptr, 0, &want, nullptr, 0);
-    if (dev != 0) {
+    if (dev == 0) {
+        std::cerr << "[Audio] Failed to open audio device: " << SDL_GetError() << "\n";
+    } else {
         SDL_PauseAudioDevice(dev, 0);
     }
 }
@@ -21,6 +28,7 @@ AudioBackend::~AudioBackend() {
     if (dev != 0) {
         SDL_CloseAudioDevice(dev);
     }
+    SDL_QuitSubSystem(SDL_INIT_AUDIO);
 }
 
 void AudioBackend::play_beep(int frequency, int duration_ms) {
@@ -29,7 +37,7 @@ void AudioBackend::play_beep(int frequency, int duration_ms) {
     std::vector<int16_t> samples(sample_count);
     for (int i = 0; i < sample_count; ++i) {
         double t = static_cast<double>(i) / 44100.0;
-        samples[i] = (std::sin(2.0 * M_PI * frequency * t) >= 0.0) ? 4000 : -4000;
+        *(samples.data() + i) = (std::sin(2.0 * M_PI * frequency * t) >= 0.0) ? 8000 : -8000;
     }
     SDL_ClearQueuedAudio(dev);
     SDL_QueueAudio(dev, samples.data(), samples.size() * sizeof(int16_t));
