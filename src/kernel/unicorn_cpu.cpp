@@ -186,6 +186,44 @@ void UnicornCpu::handle_syscall() {
             uc_mem_write(uc, rdi, buf.data(), rdx);
         }
         uc_reg_write(uc, UC_X86_REG_RAX, &rdi);
+    } else if (rax == 220) { // scePthreadCreate(thread_out, attr, entry_fn, arg)
+        uint64_t rcx = 0;
+        uc_reg_read(uc, UC_X86_REG_RCX, &rcx);
+        uint64_t thread_fn = rdx;
+        uint64_t thread_arg = rcx;
+
+        // Сохраняем контекст главного потока (регистры + указатель возврата)
+        uint64_t saved_rip = 0, saved_rsp = 0, saved_rbx = 0, saved_rbp = 0;
+        uc_reg_read(uc, UC_X86_REG_RIP, &saved_rip);
+        uc_reg_read(uc, UC_X86_REG_RSP, &saved_rsp);
+        uc_reg_read(uc, UC_X86_REG_RBX, &saved_rbx);
+        uc_reg_read(uc, UC_X86_REG_RBP, &saved_rbp);
+
+        // Запускаем фоновый поток на отдельном стеке (0xB00000) с адресом остановки 0x9F0000
+        uint64_t thread_rsp = 0xB00000;
+        uint64_t stop_addr = 0x9F0000;
+        uc_mem_write(uc, thread_rsp - 8, &stop_addr, sizeof(uint64_t));
+        uint64_t new_rsp = thread_rsp - 8;
+
+        uc_reg_write(uc, UC_X86_REG_RSP, &new_rsp);
+        uc_reg_write(uc, UC_X86_REG_RDI, &thread_arg);
+
+        std::cout << "[HLE Pthread] Spawning thread at 0x" << std::hex << thread_fn << std::dec << "\n";
+        uc_emu_start(uc, thread_fn, stop_addr, 0, 0);
+
+        // Восстанавливаем контекст главного потока
+        uc_reg_write(uc, UC_X86_REG_RSP, &saved_rsp);
+        uc_reg_write(uc, UC_X86_REG_RBX, &saved_rbx);
+        uc_reg_write(uc, UC_X86_REG_RBP, &saved_rbp);
+        uc_reg_write(uc, UC_X86_REG_RIP, &saved_rip);
+
+        uint64_t tid = 1;
+        if (rdi != 0) uc_mem_write(uc, rdi, &tid, sizeof(uint64_t));
+        uint64_t ok = 0;
+        uc_reg_write(uc, UC_X86_REG_RAX, &ok);
+    } else if (rax == 221 || rax == 222) { // scePthreadJoin & Mutex stubs
+        uint64_t ok = 0;
+        uc_reg_write(uc, UC_X86_REG_RAX, &ok);
     }
 }
 

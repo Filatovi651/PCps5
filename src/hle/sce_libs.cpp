@@ -23,7 +23,16 @@ SceLibRegistry::SceLibRegistry() {
     symbol_map.emplace("sceSystemServiceHideSplashScreen", 209);
     symbol_map.emplace("sceSystemServiceGetStatus", 209);
 
-    // 4. libc (Стандартные функции C для динамических бинарников)
+    // 4. libScePthread (Многопоточность и синхронизация)
+    symbol_map.emplace("scePthreadCreate", 220);
+    symbol_map.emplace("pthread_create", 220);
+    symbol_map.emplace("scePthreadJoin", 221);
+    symbol_map.emplace("pthread_join", 221);
+    symbol_map.emplace("scePthreadMutexInit", 222);
+    symbol_map.emplace("scePthreadMutexLock", 222);
+    symbol_map.emplace("scePthreadMutexUnlock", 222);
+
+    // 5. libc (Стандартные функции C для динамических бинарников)
     symbol_map.emplace("malloc", 208);
     symbol_map.emplace("puts", 210);
     symbol_map.emplace("memset", 211);
