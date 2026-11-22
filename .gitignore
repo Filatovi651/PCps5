@@ -1,0 +1,6 @@
+.DS_Store
+build/
+pcps5
+openhle
+cpu_test
+tests/*.elf

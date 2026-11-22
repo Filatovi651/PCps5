@@ -1,6 +1,7 @@
 #include "unicorn_cpu.h"
 #include <iostream>
 #include <cstring>
+#include <string>
 
 namespace openhle {
 namespace kernel {
@@ -29,6 +30,9 @@ UnicornCpu::UnicornCpu(openhle::core::VideoBackend* video,
 }
 
 UnicornCpu::~UnicornCpu() {
+    for (auto& kv : open_files) {
+        if (kv.second) std::fclose(kv.second);
+    }
     if (uc) uc_close(uc);
 }
 
@@ -56,10 +60,51 @@ void UnicornCpu::handle_syscall() {
     uc_reg_read(uc, UC_X86_REG_RSI, &rsi);
     uc_reg_read(uc, UC_X86_REG_RDX, &rdx);
 
-    if (rax == 1) { // sys_write
+    if (rax == 0) { // sys_read(fd, buf, count)
+        auto it = open_files.find(rdi);
+        if (it != open_files.end() && it->second) {
+            std::vector<uint8_t> buf(rdx);
+            size_t read_bytes = std::fread(buf.data(), 1, rdx, it->second);
+            if (read_bytes > 0) {
+                uc_mem_write(uc, rsi, buf.data(), read_bytes);
+            }
+            uint64_t ret = read_bytes;
+            uc_reg_write(uc, UC_X86_REG_RAX, &ret);
+        } else {
+            uint64_t err = (uint64_t)-1;
+            uc_reg_write(uc, UC_X86_REG_RAX, &err);
+        }
+    } else if (rax == 1) { // sys_write(fd, buf, count)
         std::vector<uint8_t> buf(rdx);
         uc_mem_read(uc, rsi, buf.data(), rdx);
         std::cout.write((const char*)buf.data(), rdx);
+    } else if (rax == 2) { // sys_open(path_ptr) -> sandboxed to tests/
+        char path_buf[256] = {0};
+        uc_mem_read(uc, rdi, path_buf, sizeof(path_buf) - 1);
+        std::string req_path(path_buf);
+        if (req_path.find("..") != std::string::npos) {
+            uint64_t err = (uint64_t)-1;
+            uc_reg_write(uc, UC_X86_REG_RAX, &err);
+            return;
+        }
+        std::string full_path = "tests/" + req_path;
+        FILE* f = std::fopen(full_path.c_str(), "rb");
+        if (!f) {
+            uint64_t err = (uint64_t)-1;
+            uc_reg_write(uc, UC_X86_REG_RAX, &err);
+        } else {
+            uint64_t fd = next_fd++;
+            open_files[fd] = f;
+            uc_reg_write(uc, UC_X86_REG_RAX, &fd);
+        }
+    } else if (rax == 3) { // sys_close(fd)
+        auto it = open_files.find(rdi);
+        if (it != open_files.end()) {
+            if (it->second) std::fclose(it->second);
+            open_files.erase(it);
+        }
+        uint64_t ok = 0;
+        uc_reg_write(uc, UC_X86_REG_RAX, &ok);
     } else if (rax == 60) { // sys_exit
         uc_emu_stop(uc);
     } else if (rax == 100) { // sys_present_frame + poll_input
