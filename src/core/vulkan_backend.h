@@ -14,13 +14,36 @@ class VulkanBackend {
 public:
     VulkanBackend();
     ~VulkanBackend();
-    bool is_ready() const { return instance != VK_NULL_HANDLE; }
-    std::string get_gpu_name() const { return gpu_name; }
+    bool is_ready() const { return ready; }
+    void draw_3d_frame();
 
 private:
+    bool ready = false;
     SDL_Window* window = nullptr;
     VkInstance instance = VK_NULL_HANDLE;
-    std::string gpu_name = "Unknown GPU";
+    VkSurfaceKHR surface = VK_NULL_HANDLE;
+    VkPhysicalDevice physical_device = VK_NULL_HANDLE;
+    VkDevice device = VK_NULL_HANDLE;
+    VkQueue graphics_queue = VK_NULL_HANDLE;
+
+    VkSwapchainKHR swapchain = VK_NULL_HANDLE;
+    VkFormat swapchain_format = VK_FORMAT_B8G8R8A8_UNORM;
+    VkExtent2D extent{640, 480};
+    std::vector<VkImage> swapchain_images;
+    std::vector<VkImageView> swapchain_views;
+
+    VkRenderPass render_pass = VK_NULL_HANDLE;
+    VkPipelineLayout pipeline_layout = VK_NULL_HANDLE;
+    VkPipeline graphics_pipeline = VK_NULL_HANDLE;
+    std::vector<VkFramebuffer> framebuffers;
+
+    VkCommandPool command_pool = VK_NULL_HANDLE;
+    VkCommandBuffer command_buffer = VK_NULL_HANDLE;
+    VkSemaphore image_available_sem = VK_NULL_HANDLE;
+    VkSemaphore render_finished_sem = VK_NULL_HANDLE;
+    VkFence in_flight_fence = VK_NULL_HANDLE;
+
+    VkShaderModule create_shader_module(const std::string& path);
 };
 
 } // namespace core
