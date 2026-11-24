@@ -242,7 +242,7 @@ void UnicornCpu::handle_syscall() {
                 angle += speed;
                 float c = std::cos(angle) * scale;
                 float s = std::sin(angle) * scale;
-               float mvp[] = { c, s, 0.0f, 0.0f, -s, c, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f };
+               float cy = std::cos(angle) * scale, sy = std::sin(angle) * scale, cx = std::cos(0.45f), sx = std::sin(0.45f); float mvp[] = { cy, sy*sx, sy*cx, 0.0f, 0.0f, cx*scale, -sx*scale, 0.0f, -sy, cy*sx, cy*cx, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f };
 vk.draw_3d_frame(mvp);
 SDL_Delay(16);
 }

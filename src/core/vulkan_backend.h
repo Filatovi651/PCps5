@@ -10,6 +10,11 @@
 namespace openhle {
 namespace core {
 
+struct Vertex3D {
+    float x, y, z;
+    float r, g, b;
+};
+
 class VulkanBackend {
 public:
     VulkanBackend();
@@ -37,6 +42,10 @@ private:
     VkPipeline graphics_pipeline = VK_NULL_HANDLE;
     std::vector<VkFramebuffer> framebuffers;
 
+    VkBuffer vertex_buffer = VK_NULL_HANDLE;
+    VkDeviceMemory vertex_memory = VK_NULL_HANDLE;
+    uint32_t vertex_count = 0;
+
     VkCommandPool command_pool = VK_NULL_HANDLE;
     VkCommandBuffer command_buffer = VK_NULL_HANDLE;
     VkSemaphore avail_sem = VK_NULL_HANDLE;
@@ -44,6 +53,7 @@ private:
     VkFence in_flight_fence = VK_NULL_HANDLE;
 
     VkShaderModule create_shader_module(const std::string& path);
+    uint32_t find_memory_type(uint32_t type_filter, VkMemoryPropertyFlags properties);
 };
 
 } // namespace core

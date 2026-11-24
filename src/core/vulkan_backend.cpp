@@ -6,6 +6,17 @@
 namespace openhle {
 namespace core {
 
+uint32_t VulkanBackend::find_memory_type(uint32_t type_filter, VkMemoryPropertyFlags properties) {
+    VkPhysicalDeviceMemoryProperties mem_props{};
+    vkGetPhysicalDeviceMemoryProperties(physical_device, &mem_props);
+    for (uint32_t i = 0; i < mem_props.memoryTypeCount; ++i) {
+        if ((type_filter & (1 << i)) && ((mem_props.memoryTypes[i].propertyFlags & properties) == properties)) {
+            return i;
+        }
+    }
+    return 0;
+}
+
 VkShaderModule VulkanBackend::create_shader_module(const std::string& path) {
     std::ifstream file(path, std::ios::ate | std::ios::binary);
     if (!file.is_open()) return VK_NULL_HANDLE;
@@ -27,7 +38,7 @@ VkShaderModule VulkanBackend::create_shader_module(const std::string& path) {
 VulkanBackend::VulkanBackend() {
     if (SDL_InitSubSystem(SDL_INIT_VIDEO) < 0) return;
 
-    window = SDL_CreateWindow("PCps5 3D Hardware Pipeline (Vulkan / Metal)",
+    window = SDL_CreateWindow("PCps5 3D Hardware Mesh Pipeline (Vulkan / Metal)",
                               SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED,
                               640, 480, SDL_WINDOW_VULKAN | SDL_WINDOW_SHOWN);
     if (!window) return;
@@ -43,7 +54,7 @@ VulkanBackend::VulkanBackend() {
 
     VkApplicationInfo app_info{};
     app_info.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO;
-    app_info.pApplicationName = "PCps5 3D";
+    app_info.pApplicationName = "PCps5 3D Mesh";
     app_info.apiVersion = VK_API_VERSION_1_2;
 
     VkInstanceCreateInfo inst_info{};
@@ -66,7 +77,7 @@ VulkanBackend::VulkanBackend() {
 
     VkPhysicalDeviceProperties props{};
     vkGetPhysicalDeviceProperties(physical_device, &props);
-    std::cout << "[Vulkan 3D] GPU PushConstants Active: " << props.deviceName << "\n";
+    std::cout << "[Vulkan 3D] VertexBuffer Mesh Active on: " << props.deviceName << "\n";
 
     float priority = 1.0f;
     VkDeviceQueueCreateInfo q_info{};
@@ -151,10 +162,7 @@ VulkanBackend::VulkanBackend() {
 
     VkShaderModule vert_mod = create_shader_module("shaders/vert.spv");
     VkShaderModule frag_mod = create_shader_module("shaders/frag.spv");
-    if (!vert_mod || !frag_mod) {
-        std::cerr << "[Vulkan 3D] Failed to load SPIR-V shaders from shaders/\n";
-        return;
-    }
+    if (!vert_mod || !frag_mod) return;
 
     std::vector<VkPipelineShaderStageCreateInfo> stages(2);
     stages.data()->sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
@@ -166,8 +174,27 @@ VulkanBackend::VulkanBackend() {
     (stages.data() + 1)->module = frag_mod;
     (stages.data() + 1)->pName = "main";
 
+    VkVertexInputBindingDescription bind_desc{};
+    bind_desc.binding = 0;
+    bind_desc.stride = sizeof(Vertex3D);
+    bind_desc.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
+
+    std::vector<VkVertexInputAttributeDescription> attr_descs(2);
+    attr_descs.data()->binding = 0;
+    attr_descs.data()->location = 0;
+    attr_descs.data()->format = VK_FORMAT_R32G32B32_SFLOAT;
+    attr_descs.data()->offset = 0;
+    (attr_descs.data() + 1)->binding = 0;
+    (attr_descs.data() + 1)->location = 1;
+    (attr_descs.data() + 1)->format = VK_FORMAT_R32G32B32_SFLOAT;
+    (attr_descs.data() + 1)->offset = 3 * sizeof(float);
+
     VkPipelineVertexInputStateCreateInfo vi{};
     vi.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
+    vi.vertexBindingDescriptionCount = 1;
+    vi.pVertexBindingDescriptions = &bind_desc;
+    vi.vertexAttributeDescriptionCount = 2;
+    vi.pVertexAttributeDescriptions = attr_descs.data();
 
     VkPipelineInputAssemblyStateCreateInfo ia{};
     ia.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
@@ -186,7 +213,8 @@ VulkanBackend::VulkanBackend() {
     rast.sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO;
     rast.polygonMode = VK_POLYGON_MODE_FILL;
     rast.lineWidth = 1.0f;
-    rast.cullMode = VK_CULL_MODE_NONE;
+    rast.cullMode = VK_CULL_MODE_BACK_BIT;
+    rast.frontFace = VK_FRONT_FACE_CLOCKWISE;
 
     VkPipelineMultisampleStateCreateInfo ms{};
     ms.sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO;
@@ -209,37 +237,68 @@ VulkanBackend::VulkanBackend() {
     pl_info.pushConstantRangeCount = 1;
     pl_info.pPushConstantRanges = &pc_range;
     vkCreatePipelineLayout(device, &pl_info, nullptr, &pipeline_layout);
-
-    VkGraphicsPipelineCreateInfo gp_info{};
-    gp_info.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
-    gp_info.stageCount = 2;
-    gp_info.pStages = stages.data();
-    gp_info.pVertexInputState = &vi;
-    gp_info.pInputAssemblyState = &ia;
-    gp_info.pViewportState = &vps;
-    gp_info.pRasterizationState = &rast;
-    gp_info.pMultisampleState = &ms;
-    gp_info.pColorBlendState = &cb;
-    gp_info.layout = pipeline_layout;
-    gp_info.renderPass = render_pass;
-    vkCreateGraphicsPipelines(device, VK_NULL_HANDLE, 1, &gp_info, nullptr, &graphics_pipeline);
-
-    vkDestroyShaderModule(device, frag_mod, nullptr);
-    vkDestroyShaderModule(device, vert_mod, nullptr);
-
-    framebuffers.resize(img_count);
-    for (uint32_t i = 0; i < img_count; ++i) {
-        VkImageView att = *(swapchain_views.data() + i);
-        VkFramebufferCreateInfo fb_info{};
-        fb_info.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
-        fb_info.renderPass = render_pass;
-        fb_info.attachmentCount = 1;
-        fb_info.pAttachments = &att;
-        fb_info.width = extent.width;
-        fb_info.height = extent.height;
-        fb_info.layers = 1;
-        vkCreateFramebuffer(device, &fb_info, nullptr, framebuffers.data() + i);
-    }
+   VkGraphicsPipelineCreateInfo gp_info{};
+gp_info.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
+gp_info.stageCount = 2;
+gp_info.pStages = stages.data();
+gp_info.pVertexInputState = &vi;
+gp_info.pInputAssemblyState = &ia;
+gp_info.pViewportState = &vps;
+gp_info.pRasterizationState = &rast;
+gp_info.pMultisampleState = &ms;
+gp_info.pColorBlendState = &cb;
+gp_info.layout = pipeline_layout;
+gp_info.renderPass = render_pass;
+vkCreateGraphicsPipelines(device, VK_NULL_HANDLE, 1, &gp_info, nullptr, &graphics_pipeline);
+vkDestroyShaderModule(device, frag_mod, nullptr);
+vkDestroyShaderModule(device, vert_mod, nullptr);
+// Объёмная 3D-пирамида (4 боковые грани + 2 треугольника основания = 18 вершин)
+std::vector mesh = {
+// Передняя грань (неон-розовый)
+{ 0.0f, -0.55f,  0.0f, 1.0f, 0.2f, 0.7f}, { 0.45f,  0.45f,  0.45f, 1.0f, 0.4f, 0.8f}, {-0.45f,  0.45f,  0.45f, 0.8f, 0.1f, 0.6f},
+// Правая грань (неон-голубой)
+{ 0.0f, -0.55f,  0.0f, 0.0f, 0.9f, 1.0f}, { 0.45f,  0.45f, -0.45f, 0.1f, 0.7f, 0.9f}, { 0.45f,  0.45f,  0.45f, 0.0f, 1.0f, 0.8f},
+// Задняя грань (фиолетовый)
+{ 0.0f, -0.55f,  0.0f, 0.6f, 0.1f, 1.0f}, {-0.45f,  0.45f, -0.45f, 0.4f, 0.1f, 0.8f}, { 0.45f,  0.45f, -0.45f, 0.7f, 0.2f, 1.0f},
+// Левая грань (золотой/оранжевый)
+{ 0.0f, -0.55f,  0.0f, 1.0f, 0.7f, 0.1f}, {-0.45f,  0.45f,  0.45f, 1.0f, 0.5f, 0.0f}, {-0.45f,  0.45f, -0.45f, 0.9f, 0.8f, 0.2f},
+// Дно пирамиды (2 треугольника)
+{-0.45f,  0.45f,  0.45f, 0.2f, 0.2f, 0.4f}, { 0.45f,  0.45f,  0.45f, 0.2f, 0.2f, 0.4f}, { 0.45f,  0.45f, -0.45f, 0.2f, 0.2f, 0.4f},
+{-0.45f,  0.45f,  0.45f, 0.2f, 0.2f, 0.4f}, { 0.45f,  0.45f, -0.45f, 0.2f, 0.2f, 0.4f}, {-0.45f,  0.45f, -0.45f, 0.2f, 0.2f, 0.4f}
+};
+vertex_count = (uint32_t)mesh.size();
+VkDeviceSize buf_size = sizeof(Vertex3D) * vertex_count;
+VkBufferCreateInfo buf_info{};
+buf_info.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
+buf_info.size = buf_size;
+buf_info.usage = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
+buf_info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+vkCreateBuffer(device, &buf_info, nullptr, &vertex_buffer);
+VkMemoryRequirements mem_reqs{};
+vkGetBufferMemoryRequirements(device, vertex_buffer, &mem_reqs);
+VkMemoryAllocateInfo alloc_info{};
+alloc_info.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+alloc_info.allocationSize = mem_reqs.size;
+alloc_info.memoryTypeIndex = find_memory_type(mem_reqs.memoryTypeBits, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+vkAllocateMemory(device, &alloc_info, nullptr, &vertex_memory);
+vkBindBufferMemory(device, vertex_buffer, vertex_memory, 0);
+void* mapped = nullptr;
+vkMapMemory(device, vertex_memory, 0, buf_size, 0, &mapped);
+std::memcpy(mapped, mesh.data(), (size_t)buf_size);
+vkUnmapMemory(device, vertex_memory);
+framebuffers.resize(img_count);
+for (uint32_t i = 0; i < img_count; ++i) {
+VkImageView att = *(swapchain_views.data() + i);
+VkFramebufferCreateInfo fb_info{};
+fb_info.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
+fb_info.renderPass = render_pass;
+fb_info.attachmentCount = 1;
+fb_info.pAttachments = &att;
+fb_info.width = extent.width;
+fb_info.height = extent.height;
+fb_info.layers = 1;
+vkCreateFramebuffer(device, &fb_info, nullptr, framebuffers.data() + i);
+}
 VkCommandPoolCreateInfo cp_info{};
 cp_info.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
 cp_info.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
@@ -267,7 +326,7 @@ vkAcquireNextImageKHR(device, swapchain, UINT64_MAX, avail_sem, VK_NULL_HANDLE, 
 vkResetCommandBuffer(command_buffer, 0);
 VkCommandBufferBeginInfo begin_info{VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO};
 vkBeginCommandBuffer(command_buffer, &begin_info);
-VkClearValue clear_color{{{0.08f, 0.05f, 0.14f, 1.0f}}};
+VkClearValue clear_color{{{0.06f, 0.04f, 0.12f, 1.0f}}};
 VkRenderPassBeginInfo rp_begin{};
 rp_begin.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
 rp_begin.renderPass = render_pass;
@@ -277,8 +336,10 @@ rp_begin.clearValueCount = 1;
 rp_begin.pClearValues = &clear_color;
 vkCmdBeginRenderPass(command_buffer, &rp_begin, VK_SUBPASS_CONTENTS_INLINE);
 vkCmdBindPipeline(command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, graphics_pipeline);
+VkDeviceSize offset = 0;
+vkCmdBindVertexBuffers(command_buffer, 0, 1, &vertex_buffer, &offset);
 vkCmdPushConstants(command_buffer, pipeline_layout, VK_SHADER_STAGE_VERTEX_BIT, 0, 64, mvp16);
-vkCmdDraw(command_buffer, 3, 1, 0, 0);
+vkCmdDraw(command_buffer, vertex_count, 1, 0, 0);
 vkCmdEndRenderPass(command_buffer);
 vkEndCommandBuffer(command_buffer);
 VkPipelineStageFlags wait_stage = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
@@ -305,6 +366,8 @@ vkQueuePresentKHR(graphics_queue, &present);
 VulkanBackend::~VulkanBackend() {
 if (device != VK_NULL_HANDLE) {
 vkDeviceWaitIdle(device);
+if (vertex_buffer != VK_NULL_HANDLE) vkDestroyBuffer(device, vertex_buffer, nullptr);
+if (vertex_memory != VK_NULL_HANDLE) vkFreeMemory(device, vertex_memory, nullptr);
 vkDestroySemaphore(device, render_finished_sem, nullptr);
 vkDestroySemaphore(device, avail_sem, nullptr);
 vkDestroyFence(device, in_flight_fence, nullptr);
