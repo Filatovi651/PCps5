@@ -58,6 +58,7 @@ x86_64-elf-gcc -O2 -ffreestanding -nostdlib -Wl,-Ttext=0x401000 tests/c_maze.c -
 - [x] **15.0%** — Multi-threading (`libScePthread` cooperative context switching)
 - [x] **25.0%** — Hardware 3D GPU Initialization (`Vulkan` / `MoltenVK` on Apple Silicon)
 - [x] **40.0%** — Hardware 3D Rendering Backend via Vulkan / MoltenVK
+- [x] **55.0%** — Real-Time 3D PushConstants Matrix Rotation & PS4 `libSceGnmDriver` HLE
 
 ## Contributing & Help Wanted
 

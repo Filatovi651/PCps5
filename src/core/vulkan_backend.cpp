@@ -66,7 +66,7 @@ VulkanBackend::VulkanBackend() {
 
     VkPhysicalDeviceProperties props{};
     vkGetPhysicalDeviceProperties(physical_device, &props);
-    std::cout << "[Vulkan 3D] GPU Pipeline Active: " << props.deviceName << "\n";
+    std::cout << "[Vulkan 3D] GPU PushConstants Active: " << props.deviceName << "\n";
 
     float priority = 1.0f;
     VkDeviceQueueCreateInfo q_info{};
@@ -199,8 +199,15 @@ VulkanBackend::VulkanBackend() {
     cb.attachmentCount = 1;
     cb.pAttachments = &cba;
 
+    VkPushConstantRange pc_range{};
+    pc_range.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
+    pc_range.offset = 0;
+    pc_range.size = 64;
+
     VkPipelineLayoutCreateInfo pl_info{};
     pl_info.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
+    pl_info.pushConstantRangeCount = 1;
+    pl_info.pPushConstantRanges = &pc_range;
     vkCreatePipelineLayout(device, &pl_info, nullptr, &pipeline_layout);
 
     VkGraphicsPipelineCreateInfo gp_info{};
@@ -233,11 +240,10 @@ VulkanBackend::VulkanBackend() {
         fb_info.layers = 1;
         vkCreateFramebuffer(device, &fb_info, nullptr, framebuffers.data() + i);
     }
-
-    VkCommandPoolCreateInfo cp_info{};
-    cp_info.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
-    cp_info.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
-    vkCreateCommandPool(device, &cp_info, nullptr, &command_pool);
+VkCommandPoolCreateInfo cp_info{};
+cp_info.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
+cp_info.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
+vkCreateCommandPool(device, &cp_info, nullptr, &command_pool);
 VkCommandBufferAllocateInfo cb_alloc{};
 cb_alloc.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
 cb_alloc.commandPool = command_pool;
@@ -246,12 +252,13 @@ cb_alloc.commandBufferCount = 1;
 vkAllocateCommandBuffers(device, &cb_alloc, &command_buffer);
 VkSemaphoreCreateInfo sem_info{VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO};
 VkFenceCreateInfo fence_info{VK_STRUCTURE_TYPE_FENCE_CREATE_INFO, nullptr, VK_FENCE_CREATE_SIGNALED_BIT};
-vkCreateSemaphore(device, &sem_info, nullptr, &image_available_sem);
+VkSemaphore* p_img_sem = ℑ_available_sem;
+vkCreateSemaphore(device, &sem_info, nullptr, p_img_sem);
 vkCreateSemaphore(device, &sem_info, nullptr, &render_finished_sem);
 vkCreateFence(device, &fence_info, nullptr, &in_flight_fence);
 ready = true;
 }
-void VulkanBackend::draw_3d_frame() {
+void VulkanBackend::draw_3d_frame(const float* mvp16) {
 if (!ready) return;
 vkWaitForFences(device, 1, &in_flight_fence, VK_TRUE, UINT64_MAX);
 vkResetFences(device, 1, &in_flight_fence);
@@ -270,14 +277,16 @@ rp_begin.clearValueCount = 1;
 rp_begin.pClearValues = &clear_color;
 vkCmdBeginRenderPass(command_buffer, &rp_begin, VK_SUBPASS_CONTENTS_INLINE);
 vkCmdBindPipeline(command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, graphics_pipeline);
+vkCmdPushConstants(command_buffer, pipeline_layout, VK_SHADER_STAGE_VERTEX_BIT, 0, 64, mvp16);
 vkCmdDraw(command_buffer, 3, 1, 0, 0);
 vkCmdEndRenderPass(command_buffer);
 vkEndCommandBuffer(command_buffer);
 VkPipelineStageFlags wait_stage = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+VkSemaphore* p_wait_sem = ℑ_available_sem;
 VkSubmitInfo submit{};
 submit.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
 submit.waitSemaphoreCount = 1;
-submit.pWaitSemaphores = &image_available_sem;
+submit.pWaitSemaphores = p_wait_sem;
 submit.pWaitDstStageMask = &wait_stage;
 submit.commandBufferCount = 1;
 submit.pCommandBuffers = &command_buffer;

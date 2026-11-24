@@ -15,7 +15,7 @@ public:
     VulkanBackend();
     ~VulkanBackend();
     bool is_ready() const { return ready; }
-    void draw_3d_frame();
+    void draw_3d_frame(const float* mvp16);
 
 private:
     bool ready = false;
