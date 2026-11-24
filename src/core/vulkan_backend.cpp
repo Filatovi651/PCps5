@@ -249,11 +249,11 @@ gp_info.pMultisampleState = &ms;
 gp_info.pColorBlendState = &cb;
 gp_info.layout = pipeline_layout;
 gp_info.renderPass = render_pass;
-vkCreateGraphicsPipelines(device, VK_NULL_HANDLE, 1, &gp_info, nullptr, &graphics_pipeline);
+if (vkCreateGraphicsPipelines(device, VK_NULL_HANDLE, 1, &gp_info, nullptr, &graphics_pipeline) != VK_SUCCESS) return;
 vkDestroyShaderModule(device, frag_mod, nullptr);
 vkDestroyShaderModule(device, vert_mod, nullptr);
 // Объёмная 3D-пирамида (4 боковые грани + 2 треугольника основания = 18 вершин)
-std::vector mesh = {
+std::vector<Vertex3D> mesh = {
 // Передняя грань (неон-розовый)
 { 0.0f, -0.55f,  0.0f, 1.0f, 0.2f, 0.7f}, { 0.45f,  0.45f,  0.45f, 1.0f, 0.4f, 0.8f}, {-0.45f,  0.45f,  0.45f, 0.8f, 0.1f, 0.6f},
 // Правая грань (неон-голубой)
