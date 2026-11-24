@@ -24,6 +24,8 @@ SceLibRegistry::SceLibRegistry() {
     symbol_map.emplace("sceAgcInit", 230);
     symbol_map.emplace("sceGnmDrawIndex", 231);
     symbol_map.emplace("sceGnmSubmitCommandBuffers", 231);
+    symbol_map.emplace("sceGnmDrawIndex", 231);
+    symbol_map.emplace("sceGnmSubmitCommandBuffers", 231);
 
     // 3. libSceSystemService (Системные сервисы консоли)
     symbol_map.emplace("sceSystemServiceHideSplashScreen", 209);

@@ -39,7 +39,7 @@ private:
 
     VkCommandPool command_pool = VK_NULL_HANDLE;
     VkCommandBuffer command_buffer = VK_NULL_HANDLE;
-    VkSemaphore image_available_sem = VK_NULL_HANDLE;
+    VkSemaphore avail_sem = VK_NULL_HANDLE;
     VkSemaphore render_finished_sem = VK_NULL_HANDLE;
     VkFence in_flight_fence = VK_NULL_HANDLE;
 
